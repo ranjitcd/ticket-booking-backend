@@ -140,8 +140,8 @@ const transporter = nodemailer.createTransport({
     //     pass: process.env.EMAIL_PASS // your app password
     // }
     host: "smtp.gmail.com",
-    port: 465, // SSL
-    secure: true,
+    port: 587, // SSL
+    secure: false,
     auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS,
