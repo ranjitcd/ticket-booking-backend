@@ -2,7 +2,7 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-const nodemailer = require('nodemailer');
+// const nodemailer = require('nodemailer');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
@@ -132,23 +132,91 @@ app.get("/api/bookings", verifyAdminToken, async (req, res) => {
 });
 
 // Configure nodemailer transporter (add this near the top of your file, after app setup)
-const transporter = nodemailer.createTransport({
-    // service: 'gmail', // or your email service
+// const transporter = nodemailer.createTransport({
+//     // service: 'gmail', // or your email service
 
-    // auth: {
-    //     user: process.env.EMAIL_USER, // your email
-    //     pass: process.env.EMAIL_PASS // your app password
-    // }
-    host: "smtp.gmail.com",
-    port: 587, // SSL
-    secure: false,
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-    },
-});
+//     // auth: {
+//     //     user: process.env.EMAIL_USER, // your email
+//     //     pass: process.env.EMAIL_PASS // your app password
+//     // }
+//     host: "smtp.gmail.com",
+//     port: 587, // SSL
+//     secure: false,
+//     auth: {
+//         user: process.env.EMAIL_USER,
+//         pass: process.env.EMAIL_PASS,
+//     },
+// });
+
+const sgMail = require('@sendgrid/mail');
+
+// Configure SendGrid (add this after your other requires)
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
 // Updated Approve booking endpoint with email
+// app.post("/api/bookings/approve/:bookingId", verifyAdminToken, async (req, res) => {
+//     try {
+//         const booking = await Booking.findOne({ bookingId: req.params.bookingId });
+//         if (!booking) return res.status(404).json({ success: false, error: "Booking not found" });
+
+//         if (booking.status === 'confirmed') {
+//             return res.status(400).json({ success: false, error: "Booking already approved" });
+//         }
+
+//         booking.status = 'confirmed';
+//         booking.approvedAt = new Date();
+//         booking.ticketId = `TKT-${Math.floor(100000 + Math.random() * 900000)}`;
+//         booking.bookingDate = new Date();
+
+//         await booking.save();
+
+//         // Send confirmation email
+//         const mailOptions = {
+//             from: process.env.EMAIL_USER,
+//             to: booking.email,
+//             subject: `Booking Confirmed - ${booking.eventName}`,
+//             html: `
+//                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+//                     <h2 style="color: #4CAF50;">🎭 Booking Confirmed!</h2>
+//                     <p>Dear ${booking.customerName},</p>
+//                     <p>Your booking has been confirmed. Here are your ticket details:</p>
+                    
+//                     <div style="background-color: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0;">
+//                         <p><strong>Ticket Type:</strong> ${booking.ticketType}</p>
+//                         <p><strong>Ticket ID:</strong> ${booking.ticketId}</p>
+//                         <p><strong>Booking ID:</strong> ${booking.bookingId}</p>
+//                         <p><strong>Event:</strong> ${booking.eventName}</p>
+//                         <p><strong>Event Date:</strong> ${new Date(booking.eventDate).toLocaleDateString()}</p>
+//                         <p><strong>Number of Tickets:</strong> ${booking.numberOfTickets}</p>
+//                         <p><strong>Total Amount:</strong> ₹${booking.totalPrice}</p>
+//                     </div>
+                    
+//                     <p>Please save this email for your records. Show your Ticket ID at the venue.</p>
+//                     <p>Thank you for booking with us!</p>
+                    
+//                     <hr style="margin: 30px 0; border: none; border-top: 1px solid #ddd;">
+//                     <p style="color: #666; font-size: 12px;">
+//                         If you have any questions, please contact us.
+//                     </p>
+//                 </div>
+//             `
+//         };
+
+//         // Send email (don't wait for it to complete)
+//         transporter.sendMail(mailOptions, (error, info) => {
+//             if (error) {
+//                 console.error('Error sending email:', error);
+//             } else {
+//                 console.log('Email sent:', info.response);
+//             }
+//         });
+
+//         res.json({ success: true, message: "Booking approved successfully", booking });
+//     } catch (error) {
+//         console.error("Error approving booking:", error);
+//         res.status(500).json({ success: false, error: "Failed to approve booking" });
+//     }
+// });
 app.post("/api/bookings/approve/:bookingId", verifyAdminToken, async (req, res) => {
     try {
         const booking = await Booking.findOne({ bookingId: req.params.bookingId });
@@ -165,10 +233,10 @@ app.post("/api/bookings/approve/:bookingId", verifyAdminToken, async (req, res) 
 
         await booking.save();
 
-        // Send confirmation email
-        const mailOptions = {
-            from: process.env.EMAIL_USER,
+        // Send confirmation email with SendGrid
+        const msg = {
             to: booking.email,
+            from: process.env.SENDGRID_FROM_EMAIL, // Must be your verified sender
             subject: `Booking Confirmed - ${booking.eventName}`,
             html: `
                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -197,14 +265,10 @@ app.post("/api/bookings/approve/:bookingId", verifyAdminToken, async (req, res) 
             `
         };
 
-        // Send email (don't wait for it to complete)
-        transporter.sendMail(mailOptions, (error, info) => {
-            if (error) {
-                console.error('Error sending email:', error);
-            } else {
-                console.log('Email sent:', info.response);
-            }
-        });
+        // Send email (async, don't block response)
+        sgMail.send(msg)
+            .then(() => console.log('✅ Confirmation email sent'))
+            .catch(error => console.error('❌ Error sending email:', error.response?.body || error));
 
         res.json({ success: true, message: "Booking approved successfully", booking });
     } catch (error) {
@@ -214,6 +278,52 @@ app.post("/api/bookings/approve/:bookingId", verifyAdminToken, async (req, res) 
 });
 
 // Updated Reject booking endpoint with email
+// app.post("/api/bookings/reject/:bookingId", verifyAdminToken, async (req, res) => {
+//     try {
+//         const booking = await Booking.findOne({ bookingId: req.params.bookingId });
+//         if (!booking) return res.status(404).json({ success: false, error: "Booking not found" });
+
+//         booking.status = 'rejected';
+//         await booking.save();
+
+//         // Send rejection email
+//         const mailOptions = {
+//             from: process.env.EMAIL_USER,
+//             to: booking.email,
+//             subject: `Booking Declined - ${booking.eventName}`,
+//             html: `
+//                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+//                     <h2 style="color: #f44336;">Booking Not Approved</h2>
+//                     <p>Dear ${booking.customerName},</p>
+//                     <p>We regret to inform you that your booking request could not be approved.</p>
+                    
+//                     <div style="background-color: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0;">
+//                         <p><strong>Booking ID:</strong> ${booking.bookingId}</p>
+//                         <p><strong>Event:</strong> ${booking.eventName}</p>
+//                         <p><strong>Event Date:</strong> ${new Date(booking.eventDate).toLocaleDateString()}</p>
+//                     </div>
+                    
+//                     <p>This may be due to unavailability or other reasons. Please contact us for more information.</p>
+//                     <p>We apologize for any inconvenience.</p>
+//                 </div>
+//             `
+//         };
+
+//         transporter.sendMail(mailOptions, (error, info) => {
+//             if (error) {
+//                 console.error('Error sending email:', error);
+//             } else {
+//                 console.log('Email sent:', info.response);
+//             }
+//         });
+
+//         res.json({ success: true, message: "Booking rejected successfully", booking });
+//     } catch (error) {
+//         console.error("Error rejecting booking:", error);
+//         res.status(500).json({ success: false, error: "Failed to reject booking" });
+//     }
+// });
+
 app.post("/api/bookings/reject/:bookingId", verifyAdminToken, async (req, res) => {
     try {
         const booking = await Booking.findOne({ bookingId: req.params.bookingId });
@@ -222,10 +332,10 @@ app.post("/api/bookings/reject/:bookingId", verifyAdminToken, async (req, res) =
         booking.status = 'rejected';
         await booking.save();
 
-        // Send rejection email
-        const mailOptions = {
-            from: process.env.EMAIL_USER,
+        // Send rejection email with SendGrid
+        const msg = {
             to: booking.email,
+            from: process.env.SENDGRID_FROM_EMAIL,
             subject: `Booking Declined - ${booking.eventName}`,
             html: `
                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -245,13 +355,9 @@ app.post("/api/bookings/reject/:bookingId", verifyAdminToken, async (req, res) =
             `
         };
 
-        transporter.sendMail(mailOptions, (error, info) => {
-            if (error) {
-                console.error('Error sending email:', error);
-            } else {
-                console.log('Email sent:', info.response);
-            }
-        });
+        sgMail.send(msg)
+            .then(() => console.log('✅ Rejection email sent'))
+            .catch(error => console.error('❌ Error sending email:', error.response?.body || error));
 
         res.json({ success: true, message: "Booking rejected successfully", booking });
     } catch (error) {
