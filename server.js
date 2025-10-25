@@ -40,9 +40,10 @@ const bookingSchema = new mongoose.Schema({
     totalPrice: { type: Number, required: true },
     status: {
         type: String,
-        enum: ['pending_payment', 'confirmed', 'cancelled', 'rejected'],
+        enum: ['pending_payment', 'confirmed', 'cancelled', 'rejected', 'used'],
         default: 'pending_payment'
     },
+    usedAt: { type: Date },
     createdAt: { type: Date, default: Date.now },
     approvedAt: { type: Date },
     bookingDate: { type: Date },
@@ -501,7 +502,8 @@ app.get("/api/bookings/:bookingId", async (req, res) => {
                 status: booking.status,
                 createdAt: booking.createdAt,
                 approvedAt: booking.approvedAt,
-                bookingDate: booking.bookingDate
+                bookingDate: booking.bookingDate,
+                usedAt: booking.usedAt
             }
         });
     } catch (error) {
@@ -510,6 +512,27 @@ app.get("/api/bookings/:bookingId", async (req, res) => {
             success: false,
             error: "Failed to fetch booking"
         });
+    }
+});
+
+// Mark ticket as used at venue
+app.post("/api/bookings/mark-used/:bookingId", verifyAdminToken, async (req, res) => {
+    try {
+        const booking = await Booking.findOne({ bookingId: req.params.bookingId });
+        if (!booking) return res.status(404).json({ success: false, error: "Booking not found" });
+
+        if (booking.status !== 'confirmed') {
+            return res.status(400).json({ success: false, error: "Only confirmed bookings can be marked as used" });
+        }
+
+        booking.status = 'used';
+        booking.usedAt = new Date();
+        await booking.save();
+
+        res.json({ success: true, message: "Ticket marked as used successfully", booking });
+    } catch (error) {
+        console.error("Error marking ticket as used:", error);
+        res.status(500).json({ success: false, error: "Failed to mark ticket as used" });
     }
 });
 
