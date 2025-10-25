@@ -255,6 +255,7 @@ app.post("/api/bookings/approve/:bookingId", verifyAdminToken, async (req, res) 
                     </div>
                     
                     <p>Please save this email for your records. Show your Ticket ID at the venue.</p>
+                    <p>Contact us, if you have any questions.8618030423</p>
                     <p>Thank you for booking with us!</p>
                     
                     <hr style="margin: 30px 0; border: none; border-top: 1px solid #ddd;">
@@ -350,6 +351,7 @@ app.post("/api/bookings/reject/:bookingId", verifyAdminToken, async (req, res) =
                     </div>
                     
                     <p>This may be due to unavailability or other reasons. Please contact us for more information.</p>
+                    <p>Contact us, if you have any questions.8618030423</p>
                     <p>We apologize for any inconvenience.</p>
                 </div>
             `
